@@ -1,0 +1,215 @@
+{
+  "name": "LC Code Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b52c62e6-9046-4991-806a-84f3cd2d5f51",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://leetcode.com/graphql",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) { problemsetQuestionList: questionList(categorySlug: $categorySlug, limit: $limit, skip: $skip, filters: $filters) { total: totalNum questions: data { acRate difficulty freqBar frontendQuestionId: questionFrontendId isFavor paidOnly: isPaidOnly status title titleSlug topicTags { name id slug } hasSolution hasVideoSolution } } }\",\n  \"variables\": {\n    \"categorySlug\": \"\",\n    \"skip\": {{ $json.randomNumber }} ,\n    \"limit\": 1,\n    \"filters\": {}\n  }\n} ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "dcee3fde-fb86-4889-abe7-2d1c0e83cb7f",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a LeetCode expert tutor. For this problem:\n\nTitle: {{ $json.data.problemsetQuestionList.questions[0].title }}\nSlug: {{ $json.data.problemsetQuestionList.questions[0].titleSlug }}\nDifficulty: {{ $json.data.problemsetQuestionList.questions[0].difficulty }}\n\n\nOutput ONLY in this Markdown format:\n\n## {{ $json.data.problemsetQuestionList.questions[0].title }}\n\n### Problem Understanding\n[Brief 1‑para explanation]\n\n### Approach\n[Explain the optimal solution strategy with clear reasoning. If multiple approaches exist, compare them.]\n\n### Optimal Solution (Python)\n```python\n[Provide clean, well-commented code in Python. Follow best practices and use meaningful variable names.]\n\n### Complexity Analysis\n- Time Complexity: Explain with detailed breakdown of each operation\n   - Space Complexity: Account for all data structures used\n   - Justify why this is optimal or mention if better solutions exist\n\n\n### Edge Cases\n[List important edge cases to consider and how the solution handles them]\n\n### Optimization Notes\n[Mention any trade-offs or alternative optimizations.]\n\n\nNote : Keep explanations concise but thorough. Use Big O notation correctly.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        624,
+        0
+      ],
+      "id": "be85bc7f-7459-48e2-a236-3e9ec3f8b3a6",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        496,
+        208
+      ],
+      "id": "83f5f2f0-ecf7-4525-9974-7cf1142b7f43",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "XCKgbF78RyzDbPVY",
+          "name": "OpenAi account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "akashbavaanand@gmail.com",
+        "subject": "Today's LeetCode Question",
+        "message": "={{ $json.formatted_data }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1168,
+        0
+      ],
+      "id": "91021594-35dc-4b3f-a1b7-7f85e52919ea",
+      "name": "Send a message",
+      "webhookId": "6af01af8-70dd-46d7-a032-9db3387545c8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "a5ZDNpIO4YQDKHrF",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "markdownToHtml",
+        "markdown": "={{ $json.output }}",
+        "destinationKey": "formatted_data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [
+        960,
+        0
+      ],
+      "id": "89089f7b-53bf-403c-a08d-630c357d46f5",
+      "name": "Markdown"
+    },
+    {
+      "parameters": {
+        "jsCode": "const randomNumber = Math.floor(Math.random() * 900) + 100;\nreturn [{ json: { randomNumber } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "5cf86151-71ac-411f-9850-edf583779c63",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "a489395b-a2ff-429c-a6a3-30cb22e040c0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9ce808ce57735e64b9c53167694ec3fec4381f242e26e01679a56cadb4bc9ba5"
+  },
+  "id": "HUdJL6ERvi0VY6POOJ8Tz",
+  "tags": []
+}
