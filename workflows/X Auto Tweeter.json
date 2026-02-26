@@ -1,0 +1,407 @@
+{
+  "name": "X Auto Tweeter",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "X Topic To Post About",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "What's the Topic ?"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -4576,
+        128
+      ],
+      "id": "b6a5b43b-58d0-46df-811d-fba719331a3e",
+      "name": "On form submission",
+      "webhookId": "ddcfa60c-0023-49cc-912d-aa4caeb83e65"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "searchText": "={{ $json[\"What's the Topic ?\"] }}",
+        "limit": 10,
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [
+        -4352,
+        128
+      ],
+      "id": "93d4087e-f44b-4e34-a538-35830aa6c350",
+      "name": "Search Tweets",
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "V5UJeQzMwbimPiVv",
+          "name": "X account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tweets = items.map(item => ({\n  id: item.json.id,\n  text: item.json.text.replace(/RT @\\\\w+:/, '').trim()\n}));\n\nconst tweetTexts = tweets.map(t => t.text).join('\\n\\n');\n\nreturn [{ json: { tweetTexts, count: tweets.length, topic: 'Claude Code AI tool' } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4144,
+        128
+      ],
+      "id": "08753bce-84d2-4812-8408-eff4917dfcad",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a sharp, opinionated tech blogger and X (Twitter) content strategist. \nYour job is to take the input {{$json.tweetTexts}} (a batch of {{$json.count}} \ntweets about topic {{ $json.topic }}) and write ONE punchy, insight-driven X \npost that sounds like it came from a developer/builder who's been deep in the \ntrenches — not a marketer.\n\nPERSONA\n- You write like a senior engineer or indie hacker who ships things and shares \n  raw, honest takes.\n- Your tone is direct, slightly nerdy, and occasionally sarcastic — never \n  corporate or fluffy.\n- You cite what's real (no hype, no invented numbers).\n- You reference tools, stacks, and workflows like someone who actually uses them.\n\nCONTENT RULES\n- Lead with a technical insight, a hot take, or a \"I just discovered this\" hook.\n- Back it up with 2–3 concrete bullet points (what it does, why it matters, \n  how to use it).\n- Keep it skimmable: short lines, minimal punctuation noise.\n- Use developer-friendly language: \"ships\", \"under the hood\", \"local-first\", \n  \"zero config\", \"drop-in\", \"open source\", \"self-hosted\", etc.\n- Max ~600 characters ideally; \n- Also add upto 10 relevant tags that will help the post go viral.\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -3936,
+        128
+      ],
+      "id": "2d131707-d4bd-4813-9642-11b91ed72eeb",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -3936,
+        320
+      ],
+      "id": "e04ebd5b-75be-4848-b007-0ce675931d68",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "VxvnsX1zNWiohHHh",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = ($json.output ?? $json.text ?? '').toString();\nlet text = raw.replace(/\\r\\n/g, '\\n').trim();\nconst maxCharsPerBlob = parseInt($json.maxCharsPerBlob ?? 270, 10);\nconst addNumbering = ($json.addNumbering ?? true) === true;\nif (!text.length) {\n  return [{ json: { blobIndex: 1, blobCount: 1, blobText: '' } }];\n}\nconst limit = Number.isFinite(maxCharsPerBlob) && maxCharsPerBlob > 20 ? maxCharsPerBlob : 270;\nfunction splitByLimitWords(str, chunkLimit) {\n  const words = str.split(/\\s+/);\n  const chunks = [];\n  let cur = '';\n  for (const w of words) {\n    const next = cur ? cur + ' ' + w : w;\n    if (next.length <= chunkLimit) { cur = next; }\n    else {\n      if (cur) chunks.push(cur);\n      if (w.length > chunkLimit) {\n        for (let i = 0; i < w.length; i += chunkLimit) { chunks.push(w.slice(i, i + chunkLimit)); }\n        cur = '';\n      } else { cur = w; }\n    }\n  }\n  if (cur) chunks.push(cur);\n  return chunks;\n}\nlet chunks = splitByLimitWords(text, limit);\nlet blobCount = chunks.length;\nif (addNumbering && blobCount > 1) {\n  const suffixLen = (' (' + blobCount + '/' + blobCount + ')').length;\n  const effectiveLimit = Math.max(20, limit - suffixLen);\n  chunks = splitByLimitWords(text, effectiveLimit);\n  blobCount = chunks.length;\n}\nreturn chunks.map((chunk, idx) => {\n  const i = idx + 1;\n  const suffix = (addNumbering && blobCount > 1) ? (' (' + i + '/' + blobCount + ')') : '';\n  return { json: { blobIndex: i, blobCount, blobText: (chunk + suffix).trim() } };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3584,
+        128
+      ],
+      "id": "4058f277-be07-40a5-aa66-229c4d5a91bb",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $getWorkflowStaticData('global');\ns.lastTweetId = null;\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3376,
+        128
+      ],
+      "id": "56029ff2-4d68-429e-873a-18b33527646c",
+      "name": "Reset Last Tweet ID"
+    },
+    {
+      "parameters": {
+        "batchSize": "={{ $json.blobCount }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -3168,
+        128
+      ],
+      "id": "6c529f98-e40d-4dae-874f-e7ec4ba30feb",
+      "name": "Loop Over Blobs"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3474205f-114c-4e1f-9832-1ea6c8b2ada1",
+              "leftValue": "={{ $json.blobIndex }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2944,
+        128
+      ],
+      "id": "dbac571a-1e87-465c-9340-06a1aa464a6f",
+      "name": "If First Tweet?"
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.blobText }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [
+        -2720,
+        -48
+      ],
+      "id": "077d56b1-6199-4d21-bc44-bb73b7b3dca6",
+      "name": "Create First Tweet",
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "V5UJeQzMwbimPiVv",
+          "name": "X account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $getWorkflowStaticData('global');\nif (!s.lastTweetId) {\n  throw new Error('lastTweetId is missing - first tweet may not have posted correctly.');\n}\nreturn items.map(item => ({\n  json: Object.assign({}, item.json, { lastTweetId: s.lastTweetId })\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2752,
+        384
+      ],
+      "id": "097de819-e13a-490c-b740-c144b41ba25d",
+      "name": "Inject lastTweetId"
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.blobText }}",
+        "additionalFields": {
+          "inReplyToStatusId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $json.lastTweetId }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [
+        -2512,
+        384
+      ],
+      "id": "f0dece13-0988-4b07-ad36-ec76e21e6299",
+      "name": "Create Reply Tweet",
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "V5UJeQzMwbimPiVv",
+          "name": "X account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $getWorkflowStaticData('global');\ns.lastTweetId = $json.id;\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2272,
+        128
+      ],
+      "id": "1bbd3208-5911-4412-b693-b7ee13f895aa",
+      "name": "Store Tweet ID"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Search Tweets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Tweets": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Reset Last Tweet ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reset Last Tweet ID": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Blobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Blobs": {
+      "main": [
+        [],
+        [
+          {
+            "node": "If First Tweet?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If First Tweet?": {
+      "main": [
+        [
+          {
+            "node": "Create First Tweet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Inject lastTweetId",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create First Tweet": {
+      "main": [
+        [
+          {
+            "node": "Store Tweet ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inject lastTweetId": {
+      "main": [
+        [
+          {
+            "node": "Create Reply Tweet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Reply Tweet": {
+      "main": [
+        [
+          {
+            "node": "Store Tweet ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Tweet ID": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Blobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d59b4f37-390c-4d1d-8dc7-9f0d49fe8972",
+  "meta": {
+    "instanceId": "1b5a67dcff80448491dcf07cd131b71f7c2765894471fb406bb4764077823c61"
+  },
+  "id": "HtDCh3vHLZ9m07y9",
+  "tags": []
+}
