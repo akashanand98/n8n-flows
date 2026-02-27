@@ -3,6 +3,12 @@ Repository that will consist of n8n flows for modern tasks and usecases
 
 ---
 
+<video src="https://github.com/user-attachments/assets/ccd7343b-5634-443f-b1c9-7aabc403aef3
+" controls="controls" muted autoplay loop></video>
+
+
+
+
 ## Workflows
 
 ---
