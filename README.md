@@ -12,6 +12,8 @@ Repository that will consist of n8n flows for modern tasks and usecases
 
 ---
 ### X Auto Tweeter
+![X Auto Tweeter workflow diagram](flow-diagrams/X-Auto-Tweeter-n8n-flow.png)
+
 **Purpose:** AI-powered automatic tweet generation and publishing — takes any topic, researches trending tweets about it, and posts an insightful, developer-style thread directly to your X (Twitter) account.
 
 **Trigger:** n8n Web Form (manual on-demand)
@@ -67,6 +69,8 @@ Repository that will consist of n8n flows for modern tasks and usecases
 
 ---
 ### Text To Speech (Google)
+![Text To Speech workflow diagram](flow-diagrams/Text2Speech-n8n-flow.png)
+
 **Purpose:** Converts any text string into a high-quality MP3 audio file using the **Google Cloud Text-to-Speech API** (WaveNet voices), outputting a downloadable binary audio file directly from n8n.
 
 **Trigger:** Manual — click *"Execute workflow"* in n8n
@@ -110,6 +114,8 @@ Repository that will consist of n8n flows for modern tasks and usecases
 
 ---
 ### TranscribeYT Reliable
+![Transcribe YouTube workflow diagram](flow-diagrams/TranscribeYouTube-n8n-flow.png)
+
 **Purpose:** Automatically transcribes YouTube videos and generates AI-powered summaries delivered via Telegram with video title, key highlights, prerequisites, and main takeaways.
 
 **Trigger:** Telegram message containing a YouTube video link
@@ -167,6 +173,8 @@ Repository that will consist of n8n flows for modern tasks and usecases
 
 ---
 ### TextToSpeech-Video-Generation (Experimental)
+![Text-to-Video workflow diagram](flow-diagrams/Text2VideoVeo-n8n-flow.png)
+
 **Purpose:** Generates AI-powered video content from text input by combining Google Cloud Text-to-Speech (natural audio synthesis) with Google Veo 3.1 video generation, producing a realistic podcast-style video of a host speaking naturally.
 
 **Trigger:** Manual — click *"Execute workflow"* in n8n
