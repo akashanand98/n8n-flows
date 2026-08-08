@@ -1,0 +1,147 @@
+{
+  "name": "TextToSpeech-Video-Generation-FIXED",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-2000, 112],
+      "id": "trigger-001"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "input-text",
+              "name": "inputText",
+              "value": "Hey everyone, welcome back! Today we're diving into Agentic AI — how multi-agent systems are reshaping software.",
+              "type": "string"
+            },
+            {
+              "id": "api-key",
+              "name": "geminiApiKey",
+              "value": "YOUR_GEMINI_API_KEY",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-1760, 112],
+      "id": "set-input-001"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://texttospeech.googleapis.com/v1/text:synthesize",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"input\":{\"text\":\"={{ $json.inputText }}\"},\"voice\":{\"languageCode\":\"en-US\",\"name\":\"en-US-Neural2-D\"},\"audioConfig\":{\"audioEncoding\":\"MP3\"}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-1520, 112],
+      "id": "google-tts-001"
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "audioContent",
+        "options": { "fileName": "speech.mp3", "mimeType": "audio/mpeg" }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [-1280, 112],
+      "id": "convert-audio-001"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": { "__rl": true, "value": "1OA9uKfM9W1Rc69yAZyIO4h9qHojTNHpB", "mode": "list" },
+        "options": { "binaryPropertyName": "image_data" }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [-1040, 112],
+      "id": "drive-download-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst binaryData = await this.helpers.getBinaryDataBuffer(0, 'image_data');\nconst geminiApiKey = $('Set Input Data').item.json.geminiApiKey;\n\n// Resumable upload session\nconst initiateResponse = await $http.request({\n  method: 'POST',\n  url: `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${geminiApiKey}`,\n  headers: {\n    'X-Goog-Upload-Protocol': 'resumable',\n    'X-Goog-Upload-Command': 'start',\n    'X-Goog-Upload-Header-Content-Length': binaryData.length,\n    'X-Goog-Upload-Header-Content-Type': 'image/png',\n    'Content-Type': 'application/json'\n  },\n  body: { file: { display_name: 'podcast_frame' } }\n});\n\nconst uploadUrl = initiateResponse.headers['x-goog-upload-url'];\n\nconst uploadResponse = await $http.request({\n  method: 'POST',\n  url: uploadUrl,\n  headers: { 'X-Goog-Upload-Command': 'upload, finalize', 'X-Goog-Upload-Offset': '0' },\n  body: binaryData\n});\n\nreturn [{ json: { fileUri: uploadResponse.file.uri, geminiApiKey } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-800, 112],
+      "id": "gemini-upload-001"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-001:predictLongRunning",
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-goog-api-key", "value": "={{ $json.geminiApiKey }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"instances\":[{\"prompt\":\"A podcast host talking naturally. Professional studio.\",\"image\":{\"fileData\":{\"mimeType\":\"image/png\",\"fileUri\":\"{{ $json.fileUri }}\"}}}],\"parameters\":{\"sampleCount\":1,\"personGeneration\":\"allow_adult\"}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-560, 112],
+      "id": "veo-generate-001"
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-80, 112],
+      "id": "wait-30s-001"
+    },
+    {
+      "parameters": {
+        "url": "=https://generativelanguage.googleapis.com/v1beta/{{ $node[\"Gemini Veo Generate\"].json.name }}",
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-goog-api-key", "value": "={{ $('Set Input Data').item.json.geminiApiKey }}" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [160, 112],
+      "id": "status-check-001"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            { "leftValue": "={{ $json.done }}", "rightValue": true, "operator": "equals" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [400, 112],
+      "id": "ready-if-001"
+    }
+  ],
+  "connections": {
+    "trigger-001": { "main": [[{ "node": "set-input-001", "type": "main", "index": 0 }]] },
+    "set-input-001": { "main": [[{ "node": "google-tts-001", "type": "main", "index": 0 }]] },
+    "google-tts-001": { "main": [[{ "node": "convert-audio-001", "type": "main", "index": 0 }]] },
+    "convert-audio-001": { "main": [[{ "node": "drive-download-001", "type": "main", "index": 0 }]] },
+    "drive-download-001": { "main": [[{ "node": "gemini-upload-001", "type": "main", "index": 0 }]] },
+    "gemini-upload-001": { "main": [[{ "node": "veo-generate-001", "type": "main", "index": 0 }]] },
+    "veo-generate-001": { "main": [[{ "node": "wait-30s-001", "type": "main", "index": 0 }]] },
+    "wait-30s-001": { "main": [[{ "node": "status-check-001", "type": "main", "index": 0 }]] },
+    "status-check-001": { "main": [[{ "node": "ready-if-001", "type": "main", "index": 0 }]] }
+  }
+}

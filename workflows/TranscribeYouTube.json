@@ -1,0 +1,155 @@
+{
+  "name": "TranscribeYT_Reliable",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Loop over all incoming items\nfor (const item of $input.all()) {\n  const messageText = item.json.message?.text;\n  \n  if (messageText) {\n    // Updated Regex: Looks for the exact 11-character YouTube ID\n    const regExp = /(?:youtu\\.be\\/|v\\/|u\\/\\w\\/|embed\\/|shorts\\/|watch\\?v=|\\&v=)([a-zA-Z0-9_-]{11})/;\\n    const match = messageText.match(regExp);\n    \n    if (match && match[1]) {\n      item.json.videoId = match[1];\n    } else {\n      item.json.videoId = null;\n    }\n  } else {\n    item.json.videoId = null;\n  }\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [96, 0],
+      "id": "node-code-1",
+      "name": "Extract YT ID"
+    },
+    {
+      "parameters": {
+        "updates": ["message"]
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [-192, 0],
+      "id": "node-telegram-trigger",
+      "name": "Telegram Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.youtube-transcript.io/api/transcripts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Basic 69aaa669ea18c10a744a5d6d" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"ids\": [\"{{ $json.videoId }}\"]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [304, 0],
+      "id": "node-http-1",
+      "name": "Fetch Transcript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Title: {{ $json.title }}\n\nTranscript:\n{{ $json.tracks[0].transcript.map(chunk => chunk.text).join(' ') }}\n\nYou are an expert technical writer. Distill this YouTube transcript into a summary. Extract the main topic, a short summary, 4-6 key highlights, prerequisites (or say 'None'), and a big takeaway. Do not use markdown, just provide the clean text as requested by the output schema.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [544, 0],
+      "id": "node-ai-agent",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [416, 224],
+      "id": "node-gemini",
+      "name": "Google Gemini"
+    },
+    {
+      "parameters": {
+        "schemaType": "fromJson",
+        "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"main_topic\": {\n      \"type\": \"string\",\n      \"description\": \"The main topic of the video in 5-7 words\"\n    },\n    \"summary\": {\n      \"type\": \"string\",\n      \"description\": \"A 2-3 sentence overview of the video\"\n    },\n    \"key_highlights\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"description\": \"4-6 actionable bullet points from the video\"\n    },\n    \"prerequisites\": {\n      \"type\": \"string\",\n      \"description\": \"Any technical prerequisites to understand the video, or 'None! This video is beginner-friendly.'\"\n    },\n    \"takeaway\": {\n      \"type\": \"string\",\n      \"description\": \"A single, impactful concluding sentence\"\n    }\n  },\n  \"required\": [\"main_topic\", \"summary\", \"key_highlights\", \"prerequisites\", \"takeaway\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [736, 224],
+      "id": "node-output-parser",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  // Safely extract the JSON output from the AI Agent\n  const data = item.json.output;\n  \n  // Helper function to escape HTML characters so Telegram doesn't crash\n  const escapeHtml = (unsafe) => {\n      return unsafe\n           .replace(/&/g, \"&amp;\")\n           .replace(/</g, \"&lt;\")\n           .replace(/>/g, \"&gt;\");\n  };\n\n  let htmlMessage = `<b>📌 ${escapeHtml(data.main_topic)}</b>\\n\\n`;\n  htmlMessage += `<b>📖 Summary</b>\\n${escapeHtml(data.summary)}\\n\\n`;\n  \n  htmlMessage += `<b>🔑 Key Highlights</b>\\n`;\n  data.key_highlights.forEach(point => {\n      htmlMessage += `• ${escapeHtml(point)}\\n`;\n  });\n  \n  htmlMessage += `\\n<b>🧠 Prerequisites</b>\\n${escapeHtml(data.prerequisites)}\\n\\n`;\n  htmlMessage += `<b>💡 The Big Takeaway</b>\\n${escapeHtml(data.takeaway)}`;\n\n  // Pass the safely constructed HTML string to the next node\n  item.json.telegramMessage = htmlMessage;\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 0],
+      "id": "node-code-2",
+      "name": "Format Telegram HTML"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.telegramMessage }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1184, 0],
+      "id": "node-telegram-out",
+      "name": "Send a text message"
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          { "node": "Extract YT ID", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Extract YT ID": {
+      "main": [
+        [
+          { "node": "Fetch Transcript", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Transcript": {
+      "main": [
+        [
+          { "node": "AI Agent", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Google Gemini": {
+      "ai_languageModel": [
+        [
+          { "node": "AI Agent", "type": "ai_languageModel", "index": 0 }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          { "node": "AI Agent", "type": "ai_outputParser", "index": 0 }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          { "node": "Format Telegram HTML", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Format Telegram HTML": {
+      "main": [
+        [
+          { "node": "Send a text message", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  }
+}
